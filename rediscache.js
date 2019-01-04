@@ -41,6 +41,7 @@ module.exports = function(Model, options) {
 
                     if(val !== null){
                         ctx.result = JSON.parse(val);
+                        ctx.res.set('X-Cache', true);
                         ctx.done(function(err) {
                             if (err) return next(err);
                         });

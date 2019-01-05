@@ -1,15 +1,21 @@
+const pathToRegExp = require('path-to-regexp')
+
 module.exports = function(Model, options) {
+    var redisSettings = {cache: 300}; // default cache timeout 5 mins
+
     if(options.client){
         var clientSettings = options.client;
     }else{
         var app = require('../../server/server.js');
-        var clientSettings = app.get('redis');
+        redisSettings = Object.assign(redisSettings, app.get('redis'));
+        var clientSettings = redisSettings.client;
     }
 
     var redis = require("redis"),
         client = redis.createClient(clientSettings);
 
-    var redisDeletePattern = require('redis-delete-pattern'); 
+    var redisDeletePattern = require('redis-delete-pattern');
+    let route
 
     client.on("error", function (err) {
         console.log(err);
@@ -24,11 +30,12 @@ module.exports = function(Model, options) {
 
 
     Model.beforeRemote('**', function(ctx, res, next) {
+        let path = ctx.req.baseUrl + ctx.req.path;
         // get all find methods and search first in cache
+        route = routeMatch(redisSettings.routes, path);
         if((ctx.method.name.indexOf("find") !== -1 || ctx.method.name.indexOf("__get") !== -1) && client.connected){
-            if(typeof ctx.req.query.cache != 'undefined'){
+            if(typeof ctx.req.query.cache != 'undefined' || route){
                 var modelName = ctx.method.sharedClass.name;
-                var cachExpire = ctx.req.query.cache;
 
                 // set key name
                 var cache_key = modelName+'_'+new Buffer(JSON.stringify(ctx.req.query)).toString('base64');
@@ -62,9 +69,9 @@ module.exports = function(Model, options) {
     Model.afterRemote('**', function(ctx, res, next) {
         // get all find methods and search first in cache - if not exist save in cache
         if((ctx.method.name.indexOf("find") !== -1 || ctx.method.name.indexOf("__get") !== -1) && client.connected){
-            if(typeof ctx.req.query.cache != 'undefined'){
+            if(typeof ctx.req.query.cache != 'undefined' || route){
                 var modelName = ctx.method.sharedClass.name;
-                var cachExpire = ctx.req.query.cache;
+                var cachExpire = ctx.req.query.cache || route.expire || redisSettings.cache;;
                 
                 // set key name
                 var cache_key = modelName+'_'+new Buffer(JSON.stringify(ctx.req.query)).toString('base64');
@@ -96,7 +103,6 @@ module.exports = function(Model, options) {
         // delete cache on patchOrCreate, create, delete, update, destroy, upsert
         if((ctx.method.name.indexOf("find") == -1 && ctx.method.name.indexOf("__get") == -1) && client.connected){
             var modelName = ctx.method.sharedClass.name;
-            var cachExpire = ctx.req.query.cache;
             
             // set key name
             var cache_key = modelName+'_*';
@@ -116,4 +122,28 @@ module.exports = function(Model, options) {
             next();
         }    
     });
+
+    // Follows route pattern: https://github.com/coderhaoxin/koa-redis-cache.git
+    function routeMatch(routes, path) {
+        for (let i = 0; i < routes.length; i++) {
+            let route = routes[i]
+      
+            if (paired(route.path, path)) {
+              match = true
+              return route
+              break
+            }
+          }
+          return null
+    }
+
+    // return true if path match
+    function paired(route, path) {
+        let options = {
+          sensitive: true,
+          strict: true,
+        }
+      
+        return pathToRegExp(route, [], options).exec(path)
+      }
 }

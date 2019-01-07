@@ -41,7 +41,7 @@ module.exports = function(Model, options) {
                     var modelName = ctx.method.sharedClass.name;
 
                     // set key name
-                    var request_key = JSON.stringify(ctx.req.query).toString();
+                    var request_key = JSON.stringify(Object.assign(ctx.req.query, {path, access_token:''})).toString();
                     request_key = crypto.createHash('md5').update(request_key).digest("hex");
                     var cache_key = modelName + request_key;
 
@@ -72,6 +72,7 @@ module.exports = function(Model, options) {
         });    
 
         Model.afterRemote('**', function(ctx, res, next) {
+            let path = ctx.req.baseUrl + ctx.req.path;
             // get all find methods and search first in cache - if not exist save in cache
             if((ctx.method.name.indexOf("find") !== -1 || ctx.method.name.indexOf("__get") !== -1) && client.connected){
                 if(typeof ctx.req.query.cache != 'undefined' || route){
@@ -79,7 +80,7 @@ module.exports = function(Model, options) {
                     var cachExpire = ctx.req.query.cache || route.expire || redisSettings.cache;;
                     
                     // set key name
-                    var request_key = JSON.stringify(ctx.req.query).toString();
+                    var request_key = JSON.stringify(Object.assign(ctx.req.query, {path, access_token:''})).toString();
                     request_key = crypto.createHash('md5').update(request_key).digest("hex");
                     var cache_key = modelName + request_key;
 

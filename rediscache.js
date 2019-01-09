@@ -36,7 +36,7 @@ module.exports = function(Model, options) {
             let path = ctx.req.baseUrl + ctx.req.path;
             // get all find methods and search first in cache
             route = routeMatch(redisSettings.routes, path);
-            if((ctx.method.name.indexOf("find") !== -1 || ctx.method.name.indexOf("__get") !== -1) && client.connected){
+            if((ctx.method.name.indexOf("find") !== -1 || ctx.method.name.indexOf("__get") !== -1 || ctx.req.method.indexOf("GET") !== -1) && client.connected){
                 if(typeof ctx.req.query.cache != 'undefined' || route){
                     var modelName = ctx.method.sharedClass.name;
 
@@ -74,7 +74,7 @@ module.exports = function(Model, options) {
         Model.afterRemote('**', function(ctx, res, next) {
             let path = ctx.req.baseUrl + ctx.req.path;
             // get all find methods and search first in cache - if not exist save in cache
-            if((ctx.method.name.indexOf("find") !== -1 || ctx.method.name.indexOf("__get") !== -1) && client.connected){
+            if((ctx.method.name.indexOf("find") !== -1 || ctx.method.name.indexOf("__get") !== -1 || ctx.req.method.indexOf("GET") !== -1) && client.connected){
                 if(typeof ctx.req.query.cache != 'undefined' || route){
                     var modelName = ctx.method.sharedClass.name;
                     var cachExpire = ctx.req.query.cache || route.expire || redisSettings.cache;;
@@ -110,23 +110,26 @@ module.exports = function(Model, options) {
 
         Model.afterRemote('**', function(ctx, res, next) {
             // delete cache on patchOrCreate, create, delete, update, destroy, upsert
-            if((ctx.method.name.indexOf("find") == -1 && ctx.method.name.indexOf("__get") == -1) && client.connected){
-                var modelName = ctx.method.sharedClass.name;
-                
-                // set key name
-                var cache_key = modelName+'*';
+            if((ctx.method.name.indexOf("find") == -1 && ctx.method.name.indexOf("__get") == -1 && ctx.req.method.indexOf("GET") == -1) && client.connected){
+                if(typeof ctx.req.query.cache != 'undefined' || route){
+                    var modelName = ctx.method.sharedClass.name;
+                    
+                    // set key name
+                    var cache_key = modelName+'*';
 
-                // delete cache
-                redisDeletePattern({
-                    redis: client,
-                    pattern: cache_key
-                }, function handleError (err) {
-                    if(err){
-                        console.log(err);
-                    }
+                    // delete cache
+                    redisDeletePattern({
+                        redis: client,
+                        pattern: cache_key
+                    }, function handleError (err) {
+                        if(err){
+                            console.log(err);
+                        }
+                        next();
+                    });
+                } else {
                     next();
-                });
-
+                }
             }else{
                 next();
             }    

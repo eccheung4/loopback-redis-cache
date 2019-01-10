@@ -153,8 +153,8 @@ module.exports = function(Model, options) {
     // return true if path match
     function paired(route, path) {
         let options = {
-          sensitive: true,
-          strict: true,
+          sensitive: false,
+          strict: false,
         }
       
         return pathToRegExp(route, [], options).exec(path)

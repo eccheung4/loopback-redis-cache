@@ -12,7 +12,7 @@ module.exports = function(Model, options) {
         var clientSettings = redisSettings.client;
     }
 
-    if (!clientSettings.disable) {
+    if (clientSettings.disable === 'false') {
         console.log('Enable Redis for: ', Model.name);
         var redis = require("redis"),
             client = redis.createClient(clientSettings);

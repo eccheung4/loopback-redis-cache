@@ -10,6 +10,7 @@ module.exports = function(Model, options) {
         var app = require('../../server/server.js');
         redisSettings = Object.assign(redisSettings, app.get('redis'));
         var clientSettings = redisSettings.client;
+        var models = redisSettings.models; 
     }
 
     if (clientSettings.disable === 'false') {
@@ -31,7 +32,6 @@ module.exports = function(Model, options) {
             }
         });
 
-
         Model.beforeRemote('**', function(ctx, res, next) {
             let path = ctx.req.baseUrl + ctx.req.path;
             // get all find methods and search first in cache
@@ -43,7 +43,7 @@ module.exports = function(Model, options) {
                     // set key name
                     var request_key = JSON.stringify(Object.assign(ctx.req.query, {path, access_token:''})).toString();
                     request_key = crypto.createHash('md5').update(request_key).digest("hex");
-                    var cache_key = modelName + request_key;
+                    var cache_key = modelName.toLowerCase() + request_key;
 
                     // search for cache
                     client.get(cache_key, function(err, val) {
@@ -82,7 +82,7 @@ module.exports = function(Model, options) {
                     // set key name
                     var request_key = JSON.stringify(Object.assign(ctx.req.query, {path, access_token:''})).toString();
                     request_key = crypto.createHash('md5').update(request_key).digest("hex");
-                    var cache_key = modelName + request_key;
+                    var cache_key = modelName.toLowerCase() + request_key;
 
                     // search for cache
                     client.get(cache_key, function(err, val) {
@@ -115,7 +115,16 @@ module.exports = function(Model, options) {
                     var modelName = ctx.method.sharedClass.name;
                     
                     // set key name
-                    var cache_key = modelName+'*';
+                    var cache_key = modelName.toLowerCase()+'*';
+                    var relatedModel = null;
+                    var path = ctx.req.path;
+
+                    for (let model of models) {
+                        if (path.includes(model)) {
+                            relatedModel = model;
+                            break;
+                        }
+                    }
 
                     // delete cache
                     redisDeletePattern({
@@ -124,6 +133,18 @@ module.exports = function(Model, options) {
                     }, function handleError (err) {
                         if(err){
                             console.log(err);
+                        }
+
+                        // Delete related model cache
+                        if (relatedModel != null) {
+                            redisDeletePattern({
+                                redis: client,
+                                pattern: relatedModel.toLowerCase()+'*'
+                            }, function handleError (err) {
+                                if (err) {
+                                    console.log(err);
+                                }
+                            })
                         }
                         next();
                     });

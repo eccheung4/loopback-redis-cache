@@ -42,8 +42,31 @@ module.exports = function(Model, options) {
 
                     // set key name
                     var request_key = JSON.stringify(Object.assign(ctx.req.query, {path, access_token:''})).toString();
+                    let relatedModel = '';  // add to cache key
+                    let pathRelatedModel = ''; // add to cache key
+
+                    // Get related model from filter
+                    // TODO: this only checks for single string in filter include
+                    if (ctx.req.query.filter && typeof ctx.req.query.filter === 'string') {
+                        let filter = JSON.parse(ctx.req.query.filter)
+                        if (filter.include && typeof filter.include === 'string') {
+                            let include = filter.include
+                            for (let model of models) {
+                                if (include.indexOf(model) > -1) {
+                                    relatedModel = model;
+                                }
+                            }
+                        }
+                    }
+                    // Get related model from path
+                    for (let model of models) {
+                        if (path.indexOf(model) > -1) {
+                            pathRelatedModel = model
+                        }
+                    }
+
                     request_key = crypto.createHash('md5').update(request_key).digest("hex");
-                    var cache_key = modelName.toLowerCase() + request_key;
+                    var cache_key = modelName.toLowerCase() + pathRelatedModel + relatedModel + request_key;
 
                     // search for cache
                     client.get(cache_key, function(err, val) {
@@ -81,11 +104,33 @@ module.exports = function(Model, options) {
                     
                     // set key name
                     var request_key = JSON.stringify(Object.assign(ctx.req.query, {path, access_token:''})).toString();
-                    request_key = crypto.createHash('md5').update(request_key).digest("hex");
-                    var cache_key = modelName.toLowerCase() + request_key;
+                    let relatedModel = '';
+                    let pathRelatedModel = '';
 
+                    // Get related model from filter
+                    // TODO: this only checks for single string in filter include
+                    if (ctx.req.query.filter && typeof ctx.req.query.filter === 'string') {
+                        let filter = JSON.parse(ctx.req.query.filter)
+                        if (filter.include && typeof filter.include === 'string') {
+                            let include = filter.include
+                            for (let model of models) {
+                                if (include.indexOf(model) > -1) {
+                                    relatedModel = model;
+                                }
+                            }
+                        }
+                    }
+                    // Get related model from path
+                    for (let model of models) {
+                        if (path.indexOf(model) > -1) {
+                            pathRelatedModel = model
+                        }
+                    }
+                    request_key = crypto.createHash('md5').update(request_key).digest("hex");
+                    var cache_key = modelName.toLowerCase() + pathRelatedModel + relatedModel + request_key;
                     // search for cache
                     client.get(cache_key, function(err, val) {
+
                         if(err){
                             console.log(err);
                         }
@@ -115,7 +160,7 @@ module.exports = function(Model, options) {
                     var modelName = ctx.method.sharedClass.name;
                     
                     // set key name
-                    var cache_key = modelName.toLowerCase()+'*';
+                    var cache_key = '*' + modelName.toLowerCase()+'*';
                     var relatedModel = null;
                     var path = ctx.req.path;
 
@@ -139,7 +184,7 @@ module.exports = function(Model, options) {
                         if (relatedModel != null) {
                             redisDeletePattern({
                                 redis: client,
-                                pattern: relatedModel.toLowerCase()+'*'
+                                pattern: '*' + relatedModel.toLowerCase()+'*'
                             }, function handleError (err) {
                                 if (err) {
                                     console.log(err);

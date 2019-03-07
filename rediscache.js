@@ -69,14 +69,15 @@ module.exports = function(Model, options) {
                     var cache_key = modelName.toLowerCase() + pathRelatedModel + relatedModel + request_key;
 
                     // search for cache
-                    client.get(cache_key, function(err, val) {
+                    client.multi().ttl(cache_key).get(cache_key).exec(function (err, res) {
                         if(err){
                             console.log(err);
                         }
 
-                        if(val !== null){
-                            ctx.result = JSON.parse(val);
+                        if(res[1] !== null){
+                            ctx.result = JSON.parse(res[1]);
                             ctx.res.set('X-Cache', true);
+                            ctx.res.set('X-Cache-TTL', res[0]);
                             ctx.done(function(err) {
                                 if (err) return next(err);
                             });
@@ -84,7 +85,7 @@ module.exports = function(Model, options) {
                             //return data
                             next();
                         }                
-                    });    
+                    });
 
                 }else{
                     next();
